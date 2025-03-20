@@ -1,20 +1,12 @@
 import cv2
 import numpy as np
-import pytesseract
+import easyocr
 from PIL import Image
-
-# Set Tesseract path
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+import os
 
 def preprocess_image(image):
     """
     Preprocess the image for better OCR accuracy.
-    
-    Args:
-        image: PIL Image object
-        
-    Returns:
-        PIL Image: Preprocessed image
     """
     # Convert PIL Image to OpenCV format
     img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -22,52 +14,55 @@ def preprocess_image(image):
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
-    # Apply thresholding to preprocess the image
-    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    # Denoise
+    denoised = cv2.fastNlMeansDenoising(gray)
     
-    # Apply dilation to connect text components
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
-    dilation = cv2.dilate(thresh, kernel, iterations=1)
+    # Enhance contrast
+    contrast = cv2.convertScaleAbs(denoised, alpha=1.5, beta=0)
     
-    # Convert back to PIL Image
-    return Image.fromarray(dilation)
+    return contrast
 
 def predict_text(image_path):
     """
-    Predict text from an image using Tesseract OCR.
-    
-    Args:
-        image_path (str): Path to the image file
-        
-    Returns:
-        str: Predicted text
+    Predict text from an image using EasyOCR.
     """
-    # Read image using PIL
-    image = Image.open(image_path)
-    
-    # Preprocess the image
-    processed_image = preprocess_image(image)
-    
-    # Convert to text using pytesseract with custom configuration
-    custom_config = r'--oem 3 --psm 6'
-    text = pytesseract.image_to_string(
-        processed_image,
-        config=custom_config,
-        lang='eng'
-    )
-    
-    return text.strip()
+    try:
+        # Initialize EasyOCR reader
+        reader = easyocr.Reader(['en'])
+        
+        # Read image using PIL
+        image = Image.open(image_path)
+        
+        # Preprocess the image
+        processed_image = preprocess_image(image)
+        
+        # Detect text
+        results = reader.readtext(processed_image)
+        
+        # Extract and combine text
+        text = '\n'.join([result[1] for result in results])
+        
+        return text.strip()
+    except Exception as e:
+        print(f"Error processing image: {str(e)}")
+        return None
 
 def main():
-    # Test with the sample image
-    test_image = "handwriting_ocr/dataset/images/sample.jpg"
-    try:
-        predicted_text = predict_text(test_image)
-        print("\nPredicted Text:")
+    # Get the script's directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    image_path = os.path.join(project_root, 'dataset', 'images', 'sample.jpg')
+    
+    print("\nProcessing image...")
+    predicted_text = predict_text(image_path)
+    
+    if predicted_text:
+        print("\nRecognized Text:")
         print("--------------")
         print(predicted_text)
-    except Exception as e:
-        print(f"Error: {str(e)}")
+        print("--------------")
+    else:
+        print("\nFailed to process the image. Please check the file path and ensure all dependencies are installed correctly.")
 
 if __name__ == "__main__":
     main() 
