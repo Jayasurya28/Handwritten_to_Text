@@ -1,131 +1,117 @@
 import cv2
 import numpy as np
-from PIL import Image
 import easyocr
-import nltk
-from nltk.corpus import words
 import os
-
-# Download required NLTK data
-try:
-    nltk.download('words', quiet=True)
-except:
-    print("Warning: NLTK words not available")
-
-# Load English dictionary
-WORD_LIST = set(words.words())
 
 def preprocess_image(image_path):
     """
-    Preprocess the image for better OCR results
+    Enhanced preprocessing for clear handwritten text
     """
     # Read image
     image = cv2.imread(image_path)
+    if image is None:
+        raise Exception("Could not read image")
     
     # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    # Apply thresholding to preprocess the image
-    gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    # Resize to larger size for better recognition
+    scale_factor = 2.0
+    enlarged = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
     
-    # Apply dilation to connect text components
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
-    gray = cv2.dilate(gray, kernel, iterations=1)
+    # Enhance contrast using CLAHE
+    clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(16,16))
+    enhanced = clahe.apply(enlarged)
     
-    # Apply median blur to remove noise
-    gray = cv2.medianBlur(gray, 3)
+    # Denoise while preserving edges
+    denoised = cv2.bilateralFilter(enhanced, 15, 35, 35)
     
-    return gray
-
-def correct_word(word):
-    """
-    Correct misspelled words using dictionary lookup
-    """
-    if word.lower() in WORD_LIST:
-        return word
+    # Sharpen the image
+    kernel = np.array([[-1,-1,-1],
+                      [-1, 9,-1],
+                      [-1,-1,-1]])
+    sharpened = cv2.filter2D(denoised, -1, kernel)
     
-    # Keep numbers and short words as is
-    if word.isdigit() or len(word) <= 2:
-        return word
+    # Adaptive thresholding
+    binary = cv2.adaptiveThreshold(
+        sharpened,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        25,  # Larger block size
+        15   # Higher C value
+    )
     
-    # Try to find close matches
-    matches = nltk.edit_distance(word.lower(), list(WORD_LIST))
-    if matches:
-        return matches[0]
+    # Morphological operations to connect text components
+    kernel = np.ones((2,2), np.uint8)
+    cleaned = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
     
-    return word
-
-def clean_text(text):
-    """
-    Clean and format the recognized text
-    """
-    # Remove special characters and extra spaces
-    text = ' '.join(text.split())
-    
-    # Split into sentences
-    sentences = text.split('.')
-    cleaned_sentences = []
-    
-    for sentence in sentences:
-        sentence = sentence.strip()
-        if sentence:
-            # Correct words in sentence
-            words = sentence.split()
-            corrected_words = [correct_word(word) for word in words]
-            sentence = ' '.join(corrected_words)
-            
-            # Capitalize first letter
-            sentence = sentence[0].upper() + sentence[1:].lower()
-            cleaned_sentences.append(sentence)
-    
-    return '. '.join(cleaned_sentences) + '.'
+    return cleaned
 
 def recognize_text(image_path):
     """
-    Recognize text from image using EasyOCR
+    Recognize text using EasyOCR with optimized settings
     """
     try:
-        # Initialize EasyOCR
-        reader = easyocr.Reader(['en'])
+        # Initialize EasyOCR with better defaults
+        reader = easyocr.Reader(['en'], gpu=False, recog_network='english_g2')
         
         # Preprocess image
         processed_image = preprocess_image(image_path)
         
-        # Recognize text
-        results = reader.readtext(processed_image)
+        # Save debug image
+        os.makedirs('debug', exist_ok=True)
+        cv2.imwrite('debug/preprocessed.png', processed_image)
         
-        # Extract text from results
-        text = ' '.join([result[1] for result in results])
+        # Recognize text with optimized parameters
+        results = reader.readtext(
+            processed_image,
+            paragraph=True,
+            detail=0,
+            contrast_ths=0.3,
+            adjust_contrast=0.7,
+            text_threshold=0.6,
+            width_ths=0.8,
+            height_ths=0.8,
+            add_margin=0.15,
+            mag_ratio=2.0
+        )
         
-        # Clean and format text
-        cleaned_text = clean_text(text)
+        if not results:
+            return None
+            
+        # Join results and clean up
+        text = ' '.join(results)
+        text = text.strip()
         
-        return cleaned_text
+        # Remove any non-alphanumeric characters except spaces and punctuation
+        text = ''.join(char for char in text if char.isalnum() or char.isspace() or char in '.,')
+        
+        # Remove extra spaces
+        text = ' '.join(text.split())
+        
+        return text
         
     except Exception as e:
         print(f"Error processing image: {str(e)}")
         return None
 
 def main():
-    # Create images directory if it doesn't exist
-    if not os.path.exists('images'):
-        os.makedirs('images')
-        print("Created images directory. Please add your images to this directory.")
-        return
+    # Create directories
+    for dir_name in ['images', 'output', 'debug']:
+        os.makedirs(dir_name, exist_ok=True)
     
-    # Process all images in the images directory
+    # Process images
     image_files = [f for f in os.listdir('images') if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     
     if not image_files:
         print("No image files found in the images directory.")
-        print("Please add your images to this directory and run the script again.")
         return
     
     for filename in image_files:
         image_path = os.path.join('images', filename)
         print(f"\nProcessing {filename}...")
         
-        # Recognize text
         text = recognize_text(image_path)
         
         if text:
@@ -134,10 +120,8 @@ def main():
             print(text)
             print("-" * 50)
             
-            # Save to output file
+            # Save output
             output_file = os.path.join('output', f"{os.path.splitext(filename)[0]}.txt")
-            os.makedirs('output', exist_ok=True)
-            
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(text)
             print(f"\nText saved to {output_file}")
@@ -145,4 +129,4 @@ def main():
             print(f"Failed to process {filename}")
 
 if __name__ == "__main__":
-    main() 
+    main()
