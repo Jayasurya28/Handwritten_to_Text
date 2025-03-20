@@ -51,18 +51,24 @@ def main():
     # Get the script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
-    image_path = os.path.join(project_root, 'dataset', 'images', 'sample.jpg')
+    test_dir = os.path.join(project_root, 'test_images')
     
-    print("\nProcessing image...")
-    predicted_text = predict_text(image_path)
-    
-    if predicted_text:
-        print("\nRecognized Text:")
-        print("--------------")
-        print(predicted_text)
-        print("--------------")
-    else:
-        print("\nFailed to process the image. Please check the file path and ensure all dependencies are installed correctly.")
+    # Process all images in the test directory
+    print("\nProcessing images...")
+    for filename in os.listdir(test_dir):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_path = os.path.join(test_dir, filename)
+            print(f"\nProcessing {filename}...")
+            
+            predicted_text = predict_text(image_path)
+            
+            if predicted_text:
+                print("\nRecognized Text:")
+                print("--------------")
+                print(predicted_text)
+                print("--------------")
+            else:
+                print(f"\nFailed to process {filename}. Please check the file path and ensure all dependencies are installed correctly.")
 
 if __name__ == "__main__":
     main() 
