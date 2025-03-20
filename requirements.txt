@@ -1,7 +1,8 @@
-torch>=2.0.0
-transformers>=4.30.0
+easyocr>=1.7.1
 opencv-python>=4.8.0
-Pillow>=10.0.0
 numpy>=1.24.0
-nltk>=3.8.0
-easyocr>=1.7.1 
+Pillow>=10.0.0
+pandas>=2.0.0
+tqdm>=4.65.0
+onnxruntime>=1.15.0
+mltu>=0.1.0 

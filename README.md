@@ -1,64 +1,94 @@
 # Handwritten Text Recognition
 
-This is a simple and efficient tool to convert handwritten text from images into digital text format.
-
-## Features
-
-- Converts handwritten text from images to digital text
-- Supports multiple image formats (PNG, JPG, JPEG)
-- Preprocesses images for better recognition
-- Corrects common OCR errors
-- Formats output text with proper capitalization and punctuation
-- Saves results to text files
-
-## Setup
-
-1. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-```
-
-2. Activate the virtual environment:
-- Windows (PowerShell):
-```bash
-.\venv\Scripts\activate
-```
-- Windows (Command Prompt):
-```bash
-venv\Scripts\activate.bat
-```
-
-3. Install required packages:
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-1. Create an `images` folder in the project directory
-2. Place your handwritten text images in the `images` folder
-3. Run the script:
-```bash
-python ocr_app.py
-```
-4. The recognized text will be:
-   - Displayed in the console
-   - Saved in the `output` folder as text files
+A deep learning model for recognizing handwritten text in images using a CRNN (CNN + RNN) architecture with CTC loss.
 
 ## Project Structure
 
 ```
 .
-├── images/           # Place your images here
-├── output/          # Recognized text files will be saved here
-├── venv/            # Virtual environment
-├── ocr_app.py       # Main script
-├── requirements.txt # Required packages
-└── README.md        # This file
+├── Datasets/
+│   └── IAM_Sentences/
+│       ├── ascii/
+│       └── sentences/
+├── Models/
+│   └── 04_sentence_recognition/
+├── mltu/
+│   ├── augmentors/
+│   ├── dataProvider/
+│   ├── inferenceModel/
+│   ├── preprocessors/
+│   ├── tensorflow/
+│   ├── torch/
+│   └── utils/
+├── test_images/
+├── configs.py
+├── inferenceModel.py
+├── model.py
+├── train.py
+├── requirements.txt
+└── README.md
 ```
 
-## Notes
+## Setup Instructions
 
-- Supported image formats: PNG, JPG, JPEG
-- For best results, use clear, well-lit images
-- The script will automatically create the `images` and `output` folders if they don't exist 
+1. Create and activate a virtual environment:
+   ```bash
+   python -m venv venv
+   # On Windows:
+   .\venv\Scripts\activate
+   # On Unix/MacOS:
+   source venv/bin/activate
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Download the IAM Handwriting Database:
+   - Visit [IAM Handwriting Database](https://fki.tic.heia-fr.ch/databases/iam-handwriting-database)
+   - Register for an account
+   - Download the "sentences.tgz" file
+   - Extract to `Datasets/IAM_Sentences/`
+
+## Training
+
+1. Prepare your dataset:
+   - Place training images in `Datasets/IAM_Sentences/sentences/`
+   - Place corresponding labels in `Datasets/IAM_Sentences/ascii/sentences.txt`
+
+2. Train the model:
+   ```bash
+   python train.py
+   ```
+
+The model will be saved in `Models/04_sentence_recognition/`.
+
+## Inference
+
+1. Place test images in the `test_images/` directory
+
+2. Run inference:
+   ```bash
+   python inferenceModel.py
+   ```
+
+## Model Architecture
+
+- CNN layers for feature extraction
+- Bidirectional LSTM layers for sequence processing
+- CTC loss for text recognition
+- Input shape: (32, 128, 1) - (height, width, channels)
+- Output: ASCII text
+
+## Requirements
+
+- Python 3.8+
+- TensorFlow 2.12+
+- OpenCV 4.8+
+- NumPy 1.24+
+- Additional dependencies in requirements.txt
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
