@@ -1,3 +1,0 @@
-﻿sample1.jpg Hello World
-sample2.jpg Testing OCR
-sample3.jpg Handwritten Text Recognition

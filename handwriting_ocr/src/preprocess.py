@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import os
+from skimage import exposure
 
 IMG_WIDTH, IMG_HEIGHT = 128, 32  # Standard input size
 
@@ -63,3 +64,62 @@ def load_dataset(image_dir, labels_path):
             continue
 
     return np.array(images), texts 
+
+def enhance_handwriting(image):
+    """
+    Enhanced preprocessing specifically for handwriting
+    """
+    # Convert to grayscale if not already
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image.copy()
+    
+    # Increase contrast using CLAHE
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+    
+    # Denoise
+    denoised = cv2.fastNlMeansDenoising(enhanced, h=10)
+    
+    # Adaptive thresholding
+    thresh = cv2.adaptiveThreshold(
+        denoised,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV,
+        21,
+        10
+    )
+    
+    # Remove small noise
+    kernel = np.ones((2,2), np.uint8)
+    cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+    
+    # Invert back
+    cleaned = cv2.bitwise_not(cleaned)
+    
+    return cleaned
+
+def deskew(image):
+    """
+    Deskew the image to straighten text
+    """
+    coords = np.column_stack(np.where(image > 0))
+    angle = cv2.minAreaRect(coords)[-1]
+    
+    if angle < -45:
+        angle = 90 + angle
+    
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(
+        image, 
+        M, 
+        (w, h),
+        flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_REPLICATE
+    )
+    
+    return rotated 
